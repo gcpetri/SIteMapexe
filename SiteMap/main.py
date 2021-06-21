@@ -1,7 +1,6 @@
 # pyqt imports
-from typing import Set
 from PyQt5 import QtWidgets, uic, QtGui
-from PyQt5.QtCore import pyqtSlot, Qt, QObject, pyqtSignal, QThread, QSemaphore
+from PyQt5.QtCore import pyqtSlot, Qt, pyqtSignal, QThread, QSemaphore
 
 # file imports
 from SiteMap.settings import Settings
