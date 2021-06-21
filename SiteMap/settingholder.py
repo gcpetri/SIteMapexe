@@ -6,15 +6,11 @@ class SettingHolder:
     folder_excludes = []
 
     # file restrictions
-    file_excludes_keys = []
-    file_includes_keys = []
-    file_includes = {}
-
-    # files already reviewed
-    filenames_reviewed = []
+    file_excludes = []
+    file_includes = []
 
     # files types already checked
-    checked_file_types = []
+    input_file_types = []
 
     # output file types
     output_file_types = []
@@ -23,27 +19,31 @@ class SettingHolder:
     output_file_log = 'C:\\tmp\\siteMap_log.txt'
     kml_output_file = 'C:\\tmp\\siteMap.kml'
 
-    # artifacts path
-    artifacts = 'artifacts/'
-
     # outermost directory
     dir = ''
 
     # kmz file class
     kmlFile = None
 
-    # regular expression to find gps coordinates
-    regex = r'([\(\s]?.?\d?\d\.\d*,.?.?\d?\d?\d\.\d*[\s\)]?)|([\s\(]?.?\d?\d[\.\°]\d?\d[\.\'\′]\d?\d[\.\"]?\d?\d?.?N?,?.?.?\d?\d?\d[\.\°]\d?\d[\.\'\′]\d?\d[\.\"]?\d?\d?.?W?[\s\)]?)'
+    # sample regular expression to find gps coordinates
+    # r'N\s?\d\d?.\d{5}o?,\s?W\s?-?\d\d?.\d{5}o?'
+
+    # regular expressions entered
+    regex_lines = []
 
     def printSettings():
         print('-------- SiteMap Settings --------')
-        print('Include in Folder: ', SettingHolder.folder_includes)
-        print('Exclude in Folder: ', SettingHolder.folder_excludes)
-        print('Include in File: ', str(SettingHolder.file_includes))
-        print('Exclude in File: ', SettingHolder.file_excludes_keys)
-        print('Files Reviewed: ', SettingHolder.filenames_reviewed)
-        print('File Types Reviewed: ', SettingHolder.checked_file_types)
+        print('Include Folders With: ', SettingHolder.folder_includes)
+        print('Exclude Folder With: ', SettingHolder.folder_excludes)
+        print('Include Files With: ', SettingHolder.file_includes)
+        print('Exclude Files With: ', SettingHolder.file_excludes)
+        print('Input File Types: ', SettingHolder.input_file_types)
         print('Output File Types: ', SettingHolder.output_file_types)
-        print('Output file path: ', SettingHolder.output_file_log)
+        print('Output File log: ', SettingHolder.output_file_log)
+        print('Output File kml: ', SettingHolder.kml_output_file)
         print('Outermost Directory: ', SettingHolder.dir)
         print('--------- End Settings ----------')
+
+    def getSettings():
+        settingStr = '\n-------- SiteMap Settings --------\nInclude Folders With: ' + str(SettingHolder.folder_includes) + '\nExclude Folder With: ' + str(SettingHolder.folder_excludes) + '\nInclude Files With: ' + str(SettingHolder.file_includes) +'\nExclude Files With: ' + str(SettingHolder.file_excludes) +'\nInput File Types: ' + str(SettingHolder.input_file_types) +'\nOutput File Types: ' + str(SettingHolder.output_file_types) +'\nOutput File log: ' + SettingHolder.output_file_log +'\nOutput File kml: ' + SettingHolder.kml_output_file +'\nOutermost Directory: ' + SettingHolder.dir + '\nRegular Expressions: ' + str(SettingHolder.regex_lines) + '\n--------- End Settings ----------\n\n\n'
+        return settingStr

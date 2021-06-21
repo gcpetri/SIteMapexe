@@ -1,4 +1,5 @@
 # pyqt imports
+from typing import Set
 from PyQt5 import QtWidgets, uic, QtGui
 from PyQt5.QtCore import pyqtSlot, Qt, QObject, pyqtSignal, QThread, QSemaphore
 
@@ -9,15 +10,11 @@ from SiteMap.settingholder import SettingHolder
 # python libaries
 import sys
 import os
-import time
-import PyPDF2
-from pikepdf import Pdf
+from tika import parser
 from zipfile import ZipFile
 import simplekml
 import re
 from lxml import etree
-from io import StringIO, BytesIO
-from pathlib import Path
 import math
 import time
 
@@ -30,12 +27,18 @@ class Worker(QThread):
     finished = pyqtSignal(int)
     progress = pyqtSignal(str)
     dir = []
+    regex = r''
 
     def __init__(self, index, dir):
         super(Worker, self).__init__(None)
         self.dir = dir
         self.index = index
         self.global_location = os.path.dirname(os.path.realpath(__file__))
+        for idx, value in enumerate(SettingHolder.regex_lines):
+            self.regex += '(' + value + ')'
+            if idx != len(SettingHolder.regex_lines) - 1:
+                self.regex += '|'
+        print(self.regex)
 
     def run(self):
         self.loopFolder(SettingHolder.dir, self.dir)
@@ -57,130 +60,114 @@ class Worker(QThread):
                     self.progress.emit(filePath)
                     self.loopFolder(filePath, os.listdir(filePath))
             elif os.path.isfile(filePath):
-                print('file', filePath)
-                fileContinue = len(SettingHolder.file_includes_keys) == 0
+                fileContinue = len(SettingHolder.file_includes) == 0
                 filename = os.path.basename(filePath)
-                fileContinue = filename.endswith('.kmz') and ('.kmz' in SettingHolder.checked_file_types)
-                thisFileIncludes = []
-                for fileInc in SettingHolder.file_includes_keys:
+                for fileInc in SettingHolder.file_includes:
                     if fileInc in filename:
-                        thisFileIncludes.append(fileInc)
                         fileContinue = True
-                for fileExc in SettingHolder.file_excludes_keys:
+                for fileExc in SettingHolder.file_excludes:
                     if fileExc in filename:
                         fileContinue = False
                 if fileContinue:
-                    # print(filePath)
-                    if filename.endswith('.txt'):
-                        self.handle_txt(filePath, thisFileIncludes)
-                    elif filename.endswith('.pdf'):
-                        self.handle_pdf(filePath, thisFileIncludes)
-                    elif filename.endswith('.kmz') and ('.kmz' in SettingHolder.output_file_types):
-                        self.handle_kmz(filePath)
+                    if filename.endswith('.txt') and '.txt' in SettingHolder.input_file_types:
+                        print('file', filePath)
+                        self.handle_txt(filePath)
+                    elif filename.endswith('.pdf') and '.pdf' in SettingHolder.input_file_types:
+                        print('file', filePath)
+                        self.handle_pdf(filePath)
+                if filename.endswith('.kmz') and '.kmz' in SettingHolder.input_file_types and '.kml' in SettingHolder.output_file_types:
+                    print('file', filePath)
+                    self.handle_kmz(filePath)
 
-    def handle_txt(self, filePath, thisFileIncludes):
+    def handle_txt(self, filePath):
         _name = os.path.basename(os.path.dirname(filePath))
-        fp = open(filePath)
-        file_includes = []
-        for fc in thisFileIncludes:
-            file_includes += SettingHolder.file_includes[fc]
-        oneline = ''
-        print(file_includes)
-        for i, line in enumerate(fp):
-            if i in file_includes:
-                oneline += line.strip() + ' '
-        fp.close()
-        # check for gps coordinates
-        gpsfound = False
-        if '.kmz' in SettingHolder.output_file_types:
-            print('print to kmz')
-            matchingObj = re.search(SettingHolder.regex, oneline)
-            if matchingObj:
-                gpsfound = True
-                LOCK.acquire()
-                pnt = SettingHolder.kmlFile.newpoint(name=_name)
-                pnt.coords = [eval(matchingObj.group(0))]
-                SettingHolder.kmlFile.save(SettingHolder.kml_output_file)
-                LOCK.release()
-        if '.txt' in SettingHolder.output_file_types:
+        fp = open(filePath).read()
+        # check for gps coordinate(s)
+        matchingObj = re.findall(self.regex, fp)
+        if not matchingObj:
             LOCK.acquire()
             outputFile = open(SettingHolder.output_file_log, 'a')
             outputFile.write('\n-----------------------------------------\n')
-            outputFile.write(_name + '\n')
-            outputFile.write(oneline + '\n')
-            if gpsfound:
-                outputFile.write('############ Gps coordinate found\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: no gps coordinates found in txt !!!!\n')
             outputFile.close()
             LOCK.release()
-
-
-    def handle_pdf(self, filePath, thisFileIncludes):
-        _name = os.path.basename(os.path.dirname(filePath))
-        pdfFileObj = open(filePath, 'rb')
-        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-        text = ''
-        if pdfReader.isEncrypted:
-            # print('is encrypted')
-            try:
-                with Pdf.open(filePath) as pdfFile:
-                    num_pages = len(pdfFile.pages)
-                    try:
-                        del pdfFile.pages[-1]
-                    except:
-                        pass
-                    temppdf = os.path.join(self.global_location, SettingHolder.artifacts) + str(self.index) + '_decrypted.pdf'
-                    pdfFile.save(temppdf)
-                pdfFileObj = open(temppdf, 'rb')
-                pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-            except:
-                LOCK.acquire()
-                outputFile = open(SettingHolder.output_file_log, 'a')
-                outputFile.write('\n-----------------------------------------\n')
-                outputFile.write(_name + '\n')
-                outputFile.write('pdf file could not be dycrypted !!!!!!!!\n')
-                outputFile.close()
-                LOCK.release()
-                return
-        file_includes = []
-        for fc in thisFileIncludes:
-            file_includes += SettingHolder.file_includes[fc]
-        # generate a random number
-        tempfile = os.path.join(self.global_location, SettingHolder.artifacts) + str(self.index) + '_temp_file.txt'
-        tempFile = open(tempfile, 'a+')
-        for i in range(pdfReader.numPages - 1):
-            try:
-                tempFile.write(pdfReader.getPage(i).extractText())
-            except:
-                # print('error writing to file')
-                pass
-        pdfFileObj.close()
-        oneline = ''
-        tempFile.close()
-        # print(file_includes)
-        tempFile = open(tempfile, 'r')
-        for i, line in enumerate(tempFile):
-            if i in file_includes:
-                oneline += line.strip() + ' '
-        tempFile.close()
-        # check for gps coordinate
-        gpsfound = False
+            return
+        gps_coordinates = []
+        for i in matchingObj:
+            for j in i:
+                if len(j) != 0:
+                    gps_coord = re.sub('[^0-9\.,]|\s', '', j)
+                    if len(gps_coord) != 0:
+                        gps_coordinates.append(gps_coord)
         if '.kmz' in SettingHolder.output_file_types:
-            matchingObj = re.search(SettingHolder.regex, oneline)
-            if matchingObj:
-                gpsfound = True
-                LOCK.acquire()
+            LOCK.aquire()
+            for coord in gps_coordinates:
                 pnt = SettingHolder.kmlFile.newPoint(name=_name)
-                pnt.coords = [eval(matchingObj.group(0))]
+                pnt.coords = [eval(coord)]
                 SettingHolder.kmlFile.save(SettingHolder.kml_output_file)
-                LOCK.release()
+            LOCK.release()
         if '.txt' in SettingHolder.output_file_types:
             LOCK.acquire()
             outputFile = open(SettingHolder.output_file_log, 'a')
             outputFile.write('\n-----------------------------------------\n')
-            outputFile.write(_name + '\n')
-            outputFile.write(oneline + '\n')
-            if gpsfound:
-                outputFile.write('########## Gps coordinate found\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: ' + str(matchingObj) + '\n')
+            LOCK.release()
+
+    def handle_pdf(self, filePath):
+        _name = os.path.basename(os.path.dirname(filePath))
+        parsed_pdf = None
+        try:
+            parsed_pdf = parser.from_file(filePath)
+        except:
+            LOCK.acquire()
+            outputFile = open(SettingHolder.output_file_log, 'a')
+            outputFile.write('\n-----------------------------------------\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: pdf could not be dycrypted !!!!\n')
+            outputFile.close()
+            LOCK.release()
+            return
+        if not parsed_pdf:
+            return
+        text = parsed_pdf['content'] 
+        # check for gps coordinate(s)
+        matchingObj = re.findall(self.regex, text)
+        if not matchingObj:
+            LOCK.acquire()
+            outputFile = open(SettingHolder.output_file_log, 'a')
+            outputFile.write('\n-----------------------------------------\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: no gps coordinates found in pdf !!!!\n')
+            outputFile.close()
+            LOCK.release()
+            return
+        gps_coordinates = []
+        for i in matchingObj:
+            for j in i:
+                if len(j) != 0:
+                    gps_coord = re.sub('[^0-9\.,]|\s', '', j)
+                    if len(gps_coord) != 0:
+                        gps_coordinates.append(gps_coord)
+        if '.kmz' in SettingHolder.output_file_types:
+            LOCK.acquire()
+            for coord in gps_coordinates:
+                pnt = SettingHolder.kmlFile.newPoint(name=_name)
+                pnt.coords = [eval(coord)]
+                SettingHolder.kmlFile.save(SettingHolder.kml_output_file)
+            LOCK.release()
+        if '.txt' in SettingHolder.output_file_types:
+            LOCK.acquire()
+            outputFile = open(SettingHolder.output_file_log, 'a')
+            outputFile.write('\n-----------------------------------------\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: ' + str(matchingObj) + '\n')
             outputFile.close()
             LOCK.release()
 
@@ -190,7 +177,6 @@ class Worker(QThread):
         kmz = ZipFile(filePath, 'r')
         kml = kmz.open('doc.kml', 'r').read()
         tree = etree.fromstring(kml)
-        # print(etree.tostring(tree))
         for element in tree.iter():
             if (element.tag.endswith('Point')):
                 for elem in element.iter():
@@ -228,8 +214,9 @@ class Worker(QThread):
             LOCK.acquire()
             outputFile = open(SettingHolder.output_file_log, 'a')
             outputFile.write('\n-----------------------------------------\n')
-            outputFile.write(_name + '\n')
-            outputFile.write('########## .kmz file present\n')
+            outputFile.write('Folder: ' + _name + '\n')
+            outputFile.write('File: ' + os.path.basename(filePath) + '\n')
+            outputFile.write('Log: .kmz file present ####\n')
             outputFile.close()
             LOCK.release()
 
@@ -244,7 +231,7 @@ class Dashboard(QtWidgets.QMainWindow):
         # create widget and load ui
         super().__init__()
         self._widget = QtWidgets.QMainWindow()
-        dashboardui = os.path.join(os.path.dirname(os.path.realpath(__file__)), "dashboard.ui")
+        dashboardui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dashboard.ui')
         uic.loadUi(dashboardui, self._widget)
 
         # file scraper holders
@@ -258,6 +245,8 @@ class Dashboard(QtWidgets.QMainWindow):
         self.highlight_format.setBackground(QtGui.QColor(60, 110, 113, 100))
         self.plain_format = QtGui.QTextBlockFormat()
         self.plain_format.setBackground(Qt.white)
+
+        # initialize widget element visibility
         self._widget.lbl_num_folders.setVisible(False)
         self._widget.lbl_num_folders_label.setVisible(False)
 
@@ -266,14 +255,10 @@ class Dashboard(QtWidgets.QMainWindow):
         Settings.load_settings(self._widget)
 
         self.global_location = os.path.dirname(os.path.realpath(__file__))
-
-        # ----- remove past artifacts ------
-        for f in os.listdir(os.path.join(self.global_location, SettingHolder.artifacts)):
-            os.remove(os.path.join(self.global_location, SettingHolder.artifacts, f))
     
         # ------ set button image -------
-        icon  = QtGui.QIcon(os.path.join(self.global_location,'fileSelect.png'))
-        self._widget.btn_file_drag_drop.setIcon(icon)
+        icon = QtGui.QIcon(os.path.join(self.global_location,'filePreviewIcon.png'))
+        self._widget.btn_file_preview.setIcon(icon)
 
         # ----- connect buttons -----
         # controls
@@ -294,13 +279,21 @@ class Dashboard(QtWidgets.QMainWindow):
         self._widget.btn_file_exc_del.clicked.connect(self.delFileExc)
         self._widget.cb_pdf.toggled.connect(self.Cb)
         self._widget.cb_txt.toggled.connect(self.Cb)
+        self._widget.cb_kmz.toggled.connect(self.Cb)
         self._widget.cbout_txt.toggled.connect(self.Cbout)
-        self._widget.cbout_kmz.toggled.connect(self.Cbout)
+        self._widget.cbout_kml.toggled.connect(self.Cbout)
         self._widget.btn_directory_location.clicked.connect(self.open_folder_dialog)
+        self._widget.btn_regex_clear.clicked.connect(self.clearRegex)
+        self._widget.btn_regex_add.clicked.connect(self.addRegex)
 
-        # file scraper
-        self._widget.btn_files_clear.clicked.connect(self.clear_reviewed)
-        self._widget.btn_file_drag_drop.clicked.connect(self.drag_and_drop_dialog)
+        # file regex
+        self._widget.btn_file_preview.clicked.connect(self.file_preview)
+        self._widget.list_regex.itemPressed.connect(self.removeRegex)
+        for i in SettingHolder.regex_lines:
+            listWidgetItem = QtWidgets.QListWidgetItem(i)
+            listWidgetItem.setTextAlignment(Qt.AlignCenter)
+            self._widget.list_regex.addItem(listWidgetItem)
+
 
         # set output file name
         tm1, tm2 = str(time.time()).split(".")
@@ -316,7 +309,11 @@ class Dashboard(QtWidgets.QMainWindow):
         self.num_threads = 0
         self.done_threads = 0
 
+        # redirect close event
         self._widget.closeEvent = self.closeEvent
+
+        # regex widget holder
+        self.regexWidget = None
 
         # show it!
         self._widget.show()
@@ -367,6 +364,7 @@ class Dashboard(QtWidgets.QMainWindow):
     @pyqtSlot()
     def save_settings(self):
         Settings.save_settings(self._widget)
+
     # folder modifiers
     @pyqtSlot()
     def addFolderInc(self):
@@ -376,7 +374,8 @@ class Dashboard(QtWidgets.QMainWindow):
             return
         SettingHolder.folder_includes.append(txt)
         self._widget.lbl_folders_including.setText(self._widget.lbl_folders_including.text() + ' | ' + txt)
-        self._widget.txt_folders_including.setText("")
+        self._widget.txt_folders_including.setText('')
+
     @pyqtSlot()
     def addFolderExc(self):
         txt = self._widget.txt_folders_excluding.text().strip()
@@ -385,94 +384,83 @@ class Dashboard(QtWidgets.QMainWindow):
             return
         SettingHolder.folder_excludes.append(txt)
         self._widget.lbl_folders_excluding.setText(self._widget.lbl_folders_excluding.text() + ' | ' + txt)
-        self._widget.txt_folders_excluding.setText("")
+        self._widget.txt_folders_excluding.setText('')
+
     @pyqtSlot()
     def delFolderInc(self):
         if len(SettingHolder.folder_includes) > 0:
             SettingHolder.folder_includes.pop()
-        self._widget.lbl_folders_including.setText("")
+        self._widget.lbl_folders_including.setText('')
         for i in SettingHolder.folder_includes:
             self._widget.lbl_folders_including.setText(self._widget.lbl_folders_including.text() + ' | ' + i)
+
     @pyqtSlot()
     def delFolderExc(self):
         if len(SettingHolder.folder_excludes) > 0:
             SettingHolder.folder_excludes.pop()
-        self._widget.lbl_folders_excluding.setText("")
+        self._widget.lbl_folders_excluding.setText('')
         for i in SettingHolder.folder_excludes:
             self._widget.lbl_folders_excluding.setText(self._widget.lbl_folders_excluding.text() + ' | ' + i)
+
     # file modifiers
     @pyqtSlot()
     def addFileInc(self):
         txt = self._widget.txt_files_including.text().strip()
-        if txt == '' or txt in SettingHolder.file_includes_keys: return
-        if txt in SettingHolder.file_excludes_keys:
+        if txt == '' or txt in SettingHolder.file_includes: return
+        if txt in SettingHolder.file_excludes:
             return
-        SettingHolder.file_includes_keys.append(txt)
-        SettingHolder.file_includes[txt] = []
-        self._widget.list_files.clear()
-        self._widget.list_files_lines.clear()
-        for i in SettingHolder.file_includes_keys:
-            self._widget.list_files_lines.addItem(QtWidgets.QListWidgetItem(str(SettingHolder.file_includes[i])))
-            self._widget.list_files.addItem(QtWidgets.QListWidgetItem(i))
+        SettingHolder.file_includes.append(txt)
         self._widget.lbl_files_including.setText(self._widget.lbl_files_including.text() + ' | ' + txt)
         self._widget.txt_files_including.setText('')
+
     @pyqtSlot()
     def addFileExc(self):
         txt = self._widget.txt_files_excluding.text().strip()
-        if txt == "" or txt in SettingHolder.file_excludes_keys: return
-        if txt in SettingHolder.file_includes_keys:
+        if txt == '' or txt in SettingHolder.file_excludes: return
+        if txt in SettingHolder.file_includes:
             return
-        SettingHolder.file_excludes_keys.append(txt)
+        SettingHolder.file_excludes.append(txt)
         self._widget.lbl_files_excluding.setText(self._widget.lbl_files_excluding.text() + ' | ' + txt)
-        self._widget.txt_files_excluding.setText("")
+        self._widget.txt_files_excluding.setText('')
+
     @pyqtSlot()
     def delFileInc(self):
-        if len(SettingHolder.file_includes_keys) > 0:
-            last = SettingHolder.file_includes_keys[-1]
-            SettingHolder.file_includes_keys.pop()
+        if len(SettingHolder.file_includes) > 0:
+            last = SettingHolder.file_includes[-1]
+            SettingHolder.file_includes.pop()
             print(last)
-            try:
-                del SettingHolder.file_includes[last]
-            except:
-                pass
-            self._widget.list_files.clear()
-            self._widget.list_files_lines.clear()
-            for i in SettingHolder.file_includes_keys:
-                self._widget.list_files.addItem(QtWidgets.QListWidgetItem(i))
-                self._widget.list_files_lines.addItem(QtWidgets.QListWidgetItem(str(SettingHolder.file_includes[i])))
         self._widget.lbl_files_including.setText('')
         for i in SettingHolder.file_includes:
             self._widget.lbl_files_including.setText(self._widget.lbl_files_including.text() + ' | ' + i)
+
     @pyqtSlot()
     def delFileExc(self):
-        if len(SettingHolder.file_excludes_keys) > 0:
-            last = SettingHolder.file_excludes_keys[-1]
-            SettingHolder.file_excludes_keys.pop()
+        if len(SettingHolder.file_excludes) > 0:
+            SettingHolder.file_excludes.pop()
         self._widget.lbl_files_excluding.setText('')
-        for i in SettingHolder.file_excludes_keys:
+        for i in SettingHolder.file_excludes:
             self._widget.lbl_files_excluding.setText(self._widget.lbl_files_excluding.text() + ' | ' + i)
+
     @pyqtSlot()
     def Cb(self):
-        if not self._widget.cb_pdf.isChecked() and not self._widget.cb_txt.isChecked():
-            self._widget.lbl_scraper_file_warning.setVisible(False)
-            self._widget.lbl_files_reviewed.setVisible(False)
-            self._widget.list_files.setVisible(False)
-            self._widget.btn_files_clear.setVisible(False)
-            self._widget.list_files_lines.setVisible(False)
-        else:
-            self._widget.lbl_scraper_file_warning.setVisible(True)
-            self._widget.lbl_files_reviewed.setVisible(True)
-            self._widget.list_files.setVisible(True)
-            self._widget.btn_files_clear.setVisible(True)
-            self._widget.list_files_lines.setVisible(True)
+        SettingHolder.input_file_types.clear()
+        if self._widget.cb_txt.isChecked():
+            SettingHolder.input_file_types.append('.txt')
+        if self._widget.cb_kmz.isChecked():
+            SettingHolder.input_file_types.append('.kmz')
+        if self._widget.cb_pdf.isChecked():
+            SettingHolder.input_file_types.append('.pdf')
+        print(SettingHolder.input_file_types)
+
     @pyqtSlot()
     def Cbout(self):
-        SettingHolder.output_file_types = []
+        SettingHolder.output_file_types.clear()
         if self._widget.cbout_txt.isChecked():
             SettingHolder.output_file_types.append('.txt')
-        if self._widget.cbout_kmz.isChecked():
-            SettingHolder.output_file_types.append('.kmz')
+        if self._widget.cbout_kml.isChecked():
+            SettingHolder.output_file_types.append('.kml')
         print(SettingHolder.output_file_types)
+
     @pyqtSlot()
     def open_folder_dialog(self):
         past_dir = SettingHolder.dir
@@ -494,34 +482,29 @@ class Dashboard(QtWidgets.QMainWindow):
         SettingHolder.dir = ''
         SettingHolder.folder_includes = []
         SettingHolder.folder_excludes = []
-        SettingHolder.file_includes_keys = []
-        SettingHolder.file_excludes_keys = []
-        SettingHolder.file_includes.clear()
+        SettingHolder.file_includes = []
+        SettingHolder.file_excludes = []
         SettingHolder.filenames_reviewed = []
-        SettingHolder.checked_file_types = []
+        SettingHolder.input_file_types = []
         SettingHolder.output_file_types = []
+        SettingHolder.regex_lines = []
         # file settings
         self._widget.txt_directory_location.setText('')
         self._widget.lbl_scraper_file_warning.setVisible(False)
-        self._widget.txt_files_excluding.setText('')
-        self._widget.txt_files_including.setText('')
         self._widget.txt_folders_excluding.setText('')
         self._widget.txt_folders_including.setText('')
         self._widget.lbl_folders_including.setText('')
         self._widget.lbl_folders_excluding.setText('')
+        self._widget.txt_files_excluding.setText('')
+        self._widget.txt_files_including.setText('')
         self._widget.lbl_files_including.setText('')
         self._widget.lbl_files_excluding.setText('')
         self._widget.cb_pdf.setChecked(False)
         self._widget.cb_txt.setChecked(False)
         self._widget.cb_kmz.setChecked(False)
         self._widget.cbout_txt.setChecked(False)
-        self._widget.cbout_kmz.setChecked(False)
-        # file scraper
-        self._widget.list_files.clear()
-        self._widget.list_files.setVisible(False)
-        self._widget.list_files_lines.clear()
-        self._widget.list_files_lines.setVisible(False)
-        self._widget.btn_files_clear.setVisible(False)
+        self._widget.cbout_kml.setChecked(False)
+        self._widget.list_regex.clear()
         # controls
         self._widget.lbl_error.setText('')
         self._widget.lbl_status.setText('')
@@ -529,18 +512,21 @@ class Dashboard(QtWidgets.QMainWindow):
         self._widget.lbl_num_folders.setText('0')
         self._widget.lbl_num_folders_label.setVisible(False)
         self._widget.statusBar().showMessage('')
+
     @pyqtSlot()
     def show_help(self):
         self.helpWidget = QtWidgets.QWidget()
-        helpui = os.path.join(os.path.dirname(os.path.realpath(__file__)), "help.ui")
+        helpui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'help.ui')
         uic.loadUi(helpui, self.helpWidget)
         self.helpWidget.show()
+
     @pyqtSlot()
     def show_issue(self):
         self.issueWidget = QtWidgets.QWidget()
-        issueui = os.path.join(os.path.dirname(os.path.realpath(__file__)), "issue.ui")
+        issueui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'issue.ui')
         uic.loadUi(issueui, self.issueWidget)
         self.issueWidget.show()
+
     @pyqtSlot()
     def start(self):
         self.idx = 0
@@ -552,27 +538,22 @@ class Dashboard(QtWidgets.QMainWindow):
     # ---------------- end controls -----------------
 
     # ---------------- start file scraper --------------
-    # @pyqtSlot()
     def showCurFolder(self, filePath):
         self._widget.statusBar().showMessage(filePath)
         LOCK.acquire()
         self.idx += 1
         LOCK.release()
-        self._widget.lbl_num_folders.setText(str(self.idx))   
+        self._widget.lbl_num_folders.setText(str(self.idx))
+
     def end_scraper(self):
         self._widget.lbl_status.setText('done!')
         self._widget.btn_start.setEnabled(True)
         self._widget.btn_clear.setEnabled(True)
-        for f in os.listdir(os.path.join(self.global_location, SettingHolder.artifacts)):
-            try:
-                os.remove(os.path.join(self.global_location, SettingHolder.artifacts, f))
-            except:
-                pass
         reply = QtWidgets.QMessageBox()
         reply.setIcon(QtWidgets.QMessageBox.Information)
         reply.setText('done')
         reply.exec()
-    # pyqtSlot()
+
     def end_thread(self, index):
         self.thread[index].terminate()
         print('thread ending: ', index)
@@ -580,91 +561,69 @@ class Dashboard(QtWidgets.QMainWindow):
         self.done_threads += 1
         if (self.done_threads == self.num_threads): self.end_scraper()
         LOCK.release()
+
     @pyqtSlot()
     def start_scraper(self):
         scraper_dir = self._widget.txt_directory_location.text()
         if len(scraper_dir) == 0:
             self._widget.lbl_error.setText('Choose a directory')
             return
-        if not self._widget.cb_txt.isChecked() and not self._widget.cb_pdf.isChecked() and not self._widget.cb_kmz.isChecked():
+        if len(SettingHolder.input_file_types) == 0:
             self._widget.lbl_error.setText('Select at least one input file type')
             return
-        if not self._widget.cbout_txt.isChecked() and not self._widget.cbout_kmz.isChecked():
+        if len(SettingHolder.output_file_log) == 0:
             self._widget.lbl_error.setText('Select at least one output file type')
             return
-        if (self._widget.cb_txt.isChecked() or self._widget.cb_pdf.isChecked()) and len(SettingHolder.file_includes_keys) == 0:
-            self._widget.lbl_error.setText('You must select some .txt or .pdf file lines in the file scraper')
-            return
+        if (self._widget.cb_pdf.isChecked()) and len(SettingHolder.file_includes) == 0:
+            reply = QtWidgets.QMessageBox()
+            reply.setIcon(QtWidgets.QMessageBox.Information)
+            reply.setWindowTitle("No File Includes/Excludes")
+            reply.setText('Are you sure you want to scrape from every pdf file in this directory?\n(this can take a long time)')
+            reply.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+            returnValue = reply.exec()
+            if returnValue != QtWidgets.QMessageBox.Ok:
+                return
         try:
             os.remove(SettingHolder.output_file_log)
         except:
             pass
-        del SettingHolder.checked_file_types[:]
-        if self._widget.cb_pdf.isChecked():
-            SettingHolder.checked_file_types.append('.pdf')
-        if self._widget.cb_kmz.isChecked():
-            SettingHolder.checked_file_types.append('.kmz')
-        if self._widget.cb_txt.isChecked():
-            SettingHolder.checked_file_types.append('.txt')
         self._widget.lbl_status.setText('working...')
         self._widget.btn_start.setEnabled(False)
         self._widget.btn_clear.setEnabled(False)
-        print(SettingHolder.output_file_types)
+        self._widget.lbl_num_folders.setVisible(True)
+        self._widget.lbl_num_folders_label.setVisible(True)
+        self._widget.lbl_num_folders.setText('0')
 
+        with open(SettingHolder.output_file_log, 'w+') as output_log:
+            output_log.write('======= SiteMap scraper starting =======\n')
+            output_log.write('Time: ' + str(time.time()))
+            output_log.write(SettingHolder.getSettings())
 
         # start threading
-        self._widget.lbl_status.setText('working...')
-        self._widget.lbl_num_folders.setVisible(True)
-        self._widget.lbl_num_folders.setText('0')
-        self._widget.lbl_num_folders_label.setVisible(True)
         self.init_threads()
         LOCK.release()
         for i in self.thread:
             self.thread[i].start()
-    # ------------------- file scraper -------------------
-    # specifying lines in a file
-    @pyqtSlot()
-    def fileClick(self):
-        cursor = self._widget.scraperWidget.txt_scraper.textCursor()
-        line_num = cursor.blockNumber()
-        cursor = QtGui.QTextCursor(self._widget.scraperWidget.txt_scraper.document().findBlockByNumber(line_num))
-        print(line_num)
-        if line_num in self.tempFileLines:
-            self.tempFileLines.remove(line_num)
-            cursor.setBlockFormat(self.plain_format)
-        else:
-            self.tempFileLines.append(line_num)
-            cursor.setBlockFormat(self.highlight_format)
-        self.tempFileLines.sort()
-        SettingHolder.file_includes[self.tempInclude] = self.tempFileLines
-        self._widget.list_files_lines.clear()
-        for i in SettingHolder.file_includes:
-            self._widget.list_files_lines.addItem(QtWidgets.QListWidgetItem(str(SettingHolder.file_includes[i])))
 
-    # choosing a file
+    # ---------- file scraper regex -----------
     @pyqtSlot()
-    def drag_and_drop_dialog(self):
+    def file_preview(self):
         if not self._widget.cb_pdf.isChecked() and not self._widget.cb_txt.isChecked():
             self._widget.lbl_error.setText('only .pdf or .txt files require this action')
             return
-        self._widget.lbl_files_reviewed.setText("Includes Reviewed")
-        self.tempFileLines = []
-        self.tempInclude = ''
-        # --------- begin validation --------
-        # verify outer folder is selected
         if (SettingHolder.dir == ''):
             self._widget.lbl_error.setText('Please select a directory first')
             return
 
-        options = ''
         # check what file types to open
+        options = ''
         if self._widget.cb_pdf.isChecked() and self._widget.cb_txt.isChecked():
             options = 'PDF (*.pdf);;TXT (*.txt)'
         elif self._widget.cb_pdf.isChecked():
             options += 'PDF (*.pdf)'
         elif self._widget.cb_txt.isChecked():
             options += 'TXT (*.txt)'
-
+        
         # select a file
         fileSelected = QtWidgets.QFileDialog.getOpenFileName(self._widget, 'Open File', SettingHolder.dir, options)
         file = os.path.split(fileSelected[0])
@@ -674,116 +633,112 @@ class Dashboard(QtWidgets.QMainWindow):
         if (SettingHolder.dir not in filepath):
             self._widget.lbl_error.setText('File not within the outer directory')
             return
-        folderCont = 0
-        print(os.path.basename(filepath))
-        print(SettingHolder.folder_includes)
-        print(SettingHolder.folder_excludes)
-        if len(SettingHolder.folder_includes) != 0:
-            for folder_substring in SettingHolder.folder_includes:
-                if folder_substring in os.path.basename(filepath):
-                    print(folder_substring)
-                    folderCont += 1
-            if folderCont == 0:
-                self._widget.lbl_error.setText('File not in an allowed directory, check folder includes')
-                return
-        if len(SettingHolder.folder_excludes) != 0:
-            for folder_substring in SettingHolder.folder_excludes:
-                if folder_substring in os.path.basename(filepath):
-                    self._widget.lbl_error.setText('File not in an allowed directory, check folder excludes')
-                    return
 
-        # find the right file include
-        self.tempInclude = ''
-        if len(SettingHolder.file_includes_keys) != 0:
-            sorted_list = sorted(SettingHolder.file_includes_keys, key=len)
-            for file_substring in sorted_list:
-                if file_substring in os.path.basename(fileSelected[0]):
-                    self.tempInclude = file_substring
-            if self.tempInclude == '' and (SettingHolder.file_includes_keys[0] not in ['.txt', '.pdf']):
-                self._widget.lbl_error.setText('Filename not allowed, check includes')
+        folderCont = len(SettingHolder.folder_includes) == 0
+        for folder_substring in SettingHolder.folder_includes:
+            if folder_substring in os.path.basename(filepath):
+                folderCont = True
+        if not folderCont:
+            self._widget.lbl_error.setText('File not in an allowed directory, check folder includes')
+            return
+        for folder_substring in SettingHolder.folder_excludes:
+            if folder_substring in os.path.basename(filepath):
+                self._widget.lbl_error.setText('File not in an allowed directory, check folder excludes')
                 return
-        if len(SettingHolder.file_excludes_keys) != 0:
-            for file_substring in SettingHolder.file_excludes_keys:
-                if file_substring in fileSelected[0]:
-                    self._widget.lbl_error.setText('Filename not allowed, check excludes')
-                    return
-        if self.tempInclude == '':
-            self.tempInclude = os.path.splitext(fileSelected[0])[1]
-            self._widget.lbl_files_including.setText('| ' + self.tempInclude)
-        if self.tempInclude != '':
-            item = self._widget.list_files.findItems(self.tempInclude, Qt.MatchExactly)
-            if len(item) == 0:
-                self._widget.list_files.addItem(QtWidgets.QListWidgetItem(self.tempInclude))
-                SettingHolder.file_includes_keys.append(self.tempInclude)
-            else:
-                self.tempFileLines = SettingHolder.file_includes[self.tempInclude]
-        print(self.tempInclude)
-        # end validation
-
-        # read pdf file
+        fileCont = len(SettingHolder.file_includes) == 0
+        for file_substring in SettingHolder.file_includes:
+            if file_substring in os.path.basename(fileSelected[0]):
+                fileCont = True
+        if not fileCont:
+            self._widget.lbl_error.setText('Filename not allowed, check includes')
+            return
+        for file_substring in SettingHolder.file_excludes:
+            if file_substring in os.path.basename(fileSelected[0]):
+                self._widget.lbl_error.setText('Filename not allowed, check excludes')
+                return
+        
+        # read file
         if fileSelected[1] == 'PDF (*.pdf)':
+            parsed_pdf = None
+            try:
+                parsed_pdf = parser.from_file(fileSelected[0])
+            except:
+                self._widget.lbl_error.setText('pdf could not be opened')
+                return
+            text = parsed_pdf['content'] 
             self._widget.scraperWidget = QtWidgets.QWidget()
-            scraperui = os.path.join(self.global_location, 'scraper.ui')
-            uic.loadUi(scraperui, self._widget.scraperWidget)
+            uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scraper.ui'), self._widget.scraperWidget)
             self._widget.scraperWidget.lbl_scraper_filename.setText(os.path.basename(fileSelected[0]))
             self._widget.scraperWidget.show()
-            pdfFileObj = open(fileSelected[0], 'rb')
-            pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-            text = ''
-            if pdfReader.isEncrypted:
-                print('is encrypted')
-                try:
-                    with Pdf.open(fileSelected[0]) as pdfFile:
-                        del pdfFile.pages[-1]
-                        pdfFile.save(os.path.join(self.global_location, SettingHolder.artifacts, 'decrypted.pdf'))
-                    pdfFileObj = open(os.path.join(self.global_location, SettingHolder.artifacts, 'decrypted.pdf'), 'rb')
-                    pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-                except:
-                    self._widget.lbl_error.setText('File could not be dycrypted')
-                    return
-            else:
-                print('File Not Encrypted')
-            for i in range(pdfReader.numPages - 1):
-                text += pdfReader.getPage(i).extractText()
-            pdfFileObj.close()
-            self._widget.scraperWidget.txt_scraper.setText(text)
-            self._widget.scraperWidget.txt_scraper.cursorPositionChanged.connect(self.fileClick);
-
-            cursor = ''
-            for line in self.tempFileLines:
-                cursor = QtGui.QTextCursor(self._widget.scraperWidget.txt_scraper.document().findBlockByNumber(line))
-                cursor.setBlockFormat(self.highlight_format)
-        # read text file
+            regex = r''
+            for idx, value in enumerate(SettingHolder.regex_lines):
+                regex += '(' + value + ')'
+                if idx != len(SettingHolder.regex_lines) - 1:
+                    regex += '|'
+            print(regex)
+            colorStr = '<span style=\"background-color: #7aaacc;\">'
+            resetStr = '</span>'
+            lastMatch = 0
+            formattedText = ''
+            formattedText = '<div>'
+            for match in re.finditer(regex, text):
+                start, end = match.span()
+                formattedText += text[lastMatch: start] + colorStr + text[start: end] + resetStr
+                lastMatch = end
+            formattedText += text[lastMatch:] + '</div>'
+            self._widget.scraperWidget.txt_scraper.setText(formattedText)
         elif fileSelected[1] == 'TXT (*.txt)':
             text = open(fileSelected[0]).read()
             self._widget.scraperWidget = QtWidgets.QWidget()
-            scraperui = os.path.join(self.global_location, 'scraper.ui')
-            uic.loadUi(scraperui, self._widget.scraperWidget)
-            self._widget.scraperWidget.lbl_scraper_filename.setText(fileSelected[0])
+            uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scraper.ui'), self._widget.scraperWidget)
+            self._widget.scraperWidget.lbl_scraper_filename.setText(os.path.basename(fileSelected[0]))
             self._widget.scraperWidget.show()
-            self._widget.scraperWidget.txt_scraper.setText(text)
-
-            self._widget.scraperWidget.txt_scraper.cursorPositionChanged.connect(self.fileClick)
-            cursor = ''
-            for line in self.tempFileLines:
-                cursor = QtGui.QTextCursor(self._widget.scraperWidget.txt_scraper.document().findBlockByNumber(line))
-                cursor.setBlockFormat(self.highlight_format)
+            regex = r''
+            for idx, value in enumerate(SettingHolder.regex_lines):
+                regex += '(' + value + ')'
+                if idx != len(SettingHolder.regex_lines) - 1:
+                    regex += '|'
+            print(regex)
+            colorStr = '<span style=\"background-color: #7aaacc;\">'
+            resetStr = '</span>'
+            lastMatch = 0
+            formattedText = '<div>'
+            for match in re.finditer(regex, text):
+                start, end = match.span()
+                formattedText += text[lastMatch: start] + colorStr + text[start: end] + resetStr
+                lastMatch = end
+            formattedText += text[lastMatch:] + '</div>'
+            self._widget.scraperWidget.txt_scraper.setText(formattedText)
         self._widget.lbl_error.setText('')
-        SettingHolder.filenames_reviewed.append(fileSelected[0])
+    
+    @pyqtSlot()
+    def addRegexList(self):
+        regex_entered = self.regexWidget.txt_regex_input.text()
+        if regex_entered in SettingHolder.regex_lines or len(regex_entered) == 0:
+            return
+        self.regexWidget.txt_regex_input.setText('')
+        listWidgetItem = QtWidgets.QListWidgetItem(regex_entered)
+        listWidgetItem.setTextAlignment(Qt.AlignCenter)
+        self._widget.list_regex.addItem(listWidgetItem)
+        SettingHolder.regex_lines.append(regex_entered)
 
     @pyqtSlot()
-    def clear_reviewed(self):
-        SettingHolder.filenames_reviewed = []
-        # self._widget.list_files.clear()
-        self._widget.list_files_lines.clear()
-        for fileInc in SettingHolder.file_includes_keys:
-            SettingHolder.file_includes[fileInc] = []
-        for i in range(len(SettingHolder.file_includes_keys)):
-            self._widget.list_files_lines.addItem(QtWidgets.QListWidgetItem('[]'))
+    def addRegex(self):
+        self.regexWidget = QtWidgets.QDialog()
+        uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'regex.ui'), self.regexWidget)
+        self.regexWidget.setWindowTitle('Regular Expression')
+        self.regexWidget.btn_save_regex.clicked.connect(self.addRegexList)
+        self.regexWidget.exec()
 
+    @pyqtSlot()
+    def removeRegex(self):
+        listItems = self._widget.list_regex.selectedItems()
+        if not listItems: return
+        reg = listItems[0].text()
+        self._widget.list_regex.takeItem(self._widget.list_regex.row(listItems[0]))
+        SettingHolder.regex_lines.remove(reg)
 
-#start the app
-#if __name__ == '__main__':
-#    app = QtWidgets.QApplication(sys.argv)
-#    window = Dashboard()
-#    app.exec()
+    @pyqtSlot()
+    def clearRegex(self):
+        self._widget.list_regex.clear()
+        SettingHolder.regex_lines.clear()

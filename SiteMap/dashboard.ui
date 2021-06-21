@@ -103,15 +103,6 @@
          </color>
         </brush>
        </colorrole>
-       <colorrole role="PlaceholderText">
-        <brush brushstyle="NoBrush">
-         <color alpha="128">
-          <red>255</red>
-          <green>255</green>
-          <blue>255</blue>
-         </color>
-        </brush>
-       </colorrole>
       </active>
       <inactive>
        <colorrole role="WindowText">
@@ -168,15 +159,6 @@
          </color>
         </brush>
        </colorrole>
-       <colorrole role="PlaceholderText">
-        <brush brushstyle="NoBrush">
-         <color alpha="128">
-          <red>255</red>
-          <green>255</green>
-          <blue>255</blue>
-         </color>
-        </brush>
-       </colorrole>
       </inactive>
       <disabled>
        <colorrole role="WindowText">
@@ -230,15 +212,6 @@
           <red>60</red>
           <green>110</green>
           <blue>113</blue>
-         </color>
-        </brush>
-       </colorrole>
-       <colorrole role="PlaceholderText">
-        <brush brushstyle="NoBrush">
-         <color alpha="128">
-          <red>255</red>
-          <green>255</green>
-          <blue>255</blue>
          </color>
         </brush>
        </colorrole>
@@ -307,10 +280,10 @@
        <widget class="QLabel" name="label">
         <property name="geometry">
          <rect>
-          <x>100</x>
+          <x>30</x>
           <y>50</y>
-          <width>231</width>
-          <height>31</height>
+          <width>381</width>
+          <height>41</height>
          </rect>
         </property>
         <property name="font">
@@ -325,34 +298,8 @@
          <string notr="true">color: #284B63;</string>
         </property>
         <property name="text">
-         <string>Load File Containing Location</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-       <widget class="QLabel" name="label_4">
-        <property name="geometry">
-         <rect>
-          <x>100</x>
-          <y>80</y>
-          <width>231</width>
-          <height>20</height>
-         </rect>
-        </property>
-        <property name="font">
-         <font>
-          <family>Gadugi</family>
-          <pointsize>7</pointsize>
-          <weight>50</weight>
-          <bold>false</bold>
-         </font>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">color: #353535;</string>
-        </property>
-        <property name="text">
-         <string>Address or GPS Coordinates</string>
+         <string>Preview Raw Text of File Displaying Regular
+Expression Matches</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
@@ -385,40 +332,13 @@
          <set>Qt::AlignCenter</set>
         </property>
        </widget>
-       <widget class="QLabel" name="lbl_files_reviewed">
+       <widget class="QPushButton" name="btn_file_preview">
         <property name="geometry">
          <rect>
-          <x>70</x>
-          <y>239</y>
-          <width>311</width>
-          <height>41</height>
-         </rect>
-        </property>
-        <property name="font">
-         <font>
-          <family>Gadugi</family>
-          <pointsize>7</pointsize>
-          <weight>50</weight>
-          <bold>false</bold>
-         </font>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">color: #353535;</string>
-        </property>
-        <property name="text">
-         <string>Filters Reviewed</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-       <widget class="QPushButton" name="btn_file_drag_drop">
-        <property name="geometry">
-         <rect>
-          <x>150</x>
+          <x>140</x>
           <y>110</y>
-          <width>141</width>
-          <height>91</height>
+          <width>161</width>
+          <height>111</height>
          </rect>
         </property>
         <property name="cursor">
@@ -441,89 +361,119 @@
          </size>
         </property>
        </widget>
-       <widget class="QWidget" name="gridLayoutWidget_3">
+       <widget class="QLabel" name="label_4">
+        <property name="geometry">
+         <rect>
+          <x>30</x>
+          <y>240</y>
+          <width>381</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="font">
+         <font>
+          <family>Gadugi</family>
+          <pointsize>9</pointsize>
+          <weight>50</weight>
+          <bold>false</bold>
+         </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">color: #284B63;</string>
+        </property>
+        <property name="text">
+         <string>Regular Expressions</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btn_regex_clear">
+        <property name="geometry">
+         <rect>
+          <x>320</x>
+          <y>250</y>
+          <width>80</width>
+          <height>20</height>
+         </rect>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>80</width>
+          <height>20</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>15</width>
+          <height>20</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">color: white; background-color:  #AFAFAF; border-radius: 5px;</string>
+        </property>
+        <property name="text">
+         <string>clear</string>
+        </property>
+       </widget>
+       <widget class="QListWidget" name="list_regex">
         <property name="geometry">
          <rect>
           <x>30</x>
           <y>290</y>
-          <width>378</width>
-          <height>261</height>
+          <width>375</width>
+          <height>251</height>
          </rect>
         </property>
-        <layout class="QGridLayout" name="gridLayout_3">
-         <property name="horizontalSpacing">
-          <number>3</number>
-         </property>
-         <property name="verticalSpacing">
-          <number>5</number>
-         </property>
-         <item row="2" column="0">
-          <widget class="QListWidget" name="list_files">
-           <property name="maximumSize">
-            <size>
-             <width>400</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="font">
-            <font>
-             <family>Gadugi</family>
-             <pointsize>8</pointsize>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">background-color: #3C6E71; color: white; border-radius: 5px;</string>
-           </property>
-           <property name="itemAlignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QListWidget" name="list_files_lines">
-           <property name="maximumSize">
-            <size>
-             <width>150</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="font">
-            <font>
-             <family>Gadugi</family>
-             <pointsize>8</pointsize>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">background-color: #284B63; color: white; border-radius: 5px;</string>
-           </property>
-           <property name="itemAlignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QPushButton" name="btn_files_clear">
-           <property name="minimumSize">
-            <size>
-             <width>200</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>20</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">color: white; background-color:  #AFAFAF; border-radius: 5px;</string>
-           </property>
-           <property name="text">
-            <string>clear files</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>375</width>
+          <height>260</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <family>Gadugi</family>
+          <pointsize>8</pointsize>
+         </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background-color: #3C6E71; color: white; border-radius: 5px;</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btn_regex_add">
+        <property name="geometry">
+         <rect>
+          <x>30</x>
+          <y>250</y>
+          <width>80</width>
+          <height>20</height>
+         </rect>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>80</width>
+          <height>20</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>15</width>
+          <height>20</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">color: white; background-color: #4D9093; border-radius: 5px;</string>
+        </property>
+        <property name="text">
+         <string>add</string>
+        </property>
        </widget>
       </widget>
      </item>
@@ -605,7 +555,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QCheckBox" name="cbout_kmz">
+            <widget class="QCheckBox" name="cbout_kml">
              <property name="font">
               <font>
                <family>Gadugi</family>
@@ -836,10 +786,10 @@
               </font>
              </property>
              <property name="text">
-              <string>Only look at FILES with name **including**</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only look at FILES with name &lt;span style=&quot; font-weight:600;&quot;&gt;including&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="textFormat">
-              <enum>Qt::MarkdownText</enum>
+              <enum>Qt::RichText</enum>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -854,10 +804,10 @@
               </font>
              </property>
              <property name="text">
-              <string>Only look at FOLDERS with name **excluding**</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only look at FOLDERS with name &lt;span style=&quot; font-weight:600;&quot;&gt;excluding&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="textFormat">
-              <enum>Qt::MarkdownText</enum>
+              <enum>Qt::RichText</enum>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -997,10 +947,10 @@
               </font>
              </property>
              <property name="text">
-              <string>Only look at FOLDERS with name **including**</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only look at FOLDERS with name &lt;span style=&quot; font-weight:600;&quot;&gt;including&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="textFormat">
-              <enum>Qt::MarkdownText</enum>
+              <enum>Qt::RichText</enum>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1015,10 +965,10 @@
               </font>
              </property>
              <property name="text">
-              <string>Only look at FILES with name **excluding**</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only look at FILES with name &lt;span style=&quot; font-weight:600;&quot;&gt;excluding&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="textFormat">
-              <enum>Qt::MarkdownText</enum>
+              <enum>Qt::RichText</enum>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1204,10 +1154,7 @@
         </property>
         <property name="font">
          <font>
-          <family>Gadugi</family>
           <pointsize>-1</pointsize>
-          <weight>75</weight>
-          <bold>true</bold>
          </font>
         </property>
         <property name="cursor">
@@ -1243,10 +1190,7 @@
         </property>
         <property name="font">
          <font>
-          <family>Gadugi</family>
           <pointsize>-1</pointsize>
-          <weight>50</weight>
-          <bold>false</bold>
          </font>
         </property>
         <property name="cursor">

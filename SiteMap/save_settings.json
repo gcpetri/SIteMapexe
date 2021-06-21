@@ -1,11 +1,12 @@
 {
-    "dir": "",
-    "checked-file-types": [],
+    "dir": "C:/",
+    "input-file-types": [],
     "output-file-types": [],
     "folder-includes": [],
     "folder-excludes": [],
-    "file-includes-keys": [],
-    "file-excludes-keys": [],
-    "file-includes": {},
-    "files-reviewed": []
+    "file-includes": [],
+    "file-excludes": [],
+    "regex-lines": [
+        "N\\s?\\d\\d?.\\d{5}o?,\\s?W\\s?-?\\d\\d?.\\d{5}o?"
+    ]
 }
