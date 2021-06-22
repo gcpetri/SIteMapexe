@@ -4,13 +4,15 @@ from SiteMap.settings import Settings
 from SiteMap.settingholder import SettingHolder
 import sys
 import os
-from tika import parser
 from zipfile import ZipFile
 import simplekml
 import re
 from lxml import etree
 import math
 import time
+import tika
+tika.initVM()
+from tika import parser
 
 # ============== Thread Semaphore ============ #
 LOCK = QSemaphore(0)
@@ -26,7 +28,12 @@ class Worker(QThread):
         super(Worker, self).__init__(None)
         self.dir = dir
         self.index = index
-        self.global_location = os.path.dirname(os.path.realpath(__file__))
+        # find global location
+        if getattr(sys, 'frozen', False):
+            application_path = os.path.join(os.path.dirname(sys.executable), 'SiteMap')
+        elif __file__:
+            application_path = os.path.dirname(__file__)
+        self.global_location = application_path
         for idx, value in enumerate(SettingHolder.regex_lines):
             self.regex += '(' + value + ')'
             if idx != len(SettingHolder.regex_lines) - 1:
@@ -221,12 +228,19 @@ class Dashboard(QtWidgets.QMainWindow):
 
     def __init__(self):
 
-        print(sys.path)
+        # find global location
+        if getattr(sys, 'frozen', False):
+            application_path = os.path.join(os.path.dirname(sys.executable), 'SiteMap')
+        elif __file__:
+            application_path = os.path.dirname(__file__)
+        self.global_location = application_path
+        print(self.global_location)
 
         # create widget and load ui
         super().__init__()
         self._widget = QtWidgets.QMainWindow()
-        dashboardui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dashboard.ui')
+        dashboardui = os.path.join(self.global_location, 'dashboard.ui')
+        print(dashboardui)
         uic.loadUi(dashboardui, self._widget)
 
         # file scraper holders
@@ -248,11 +262,9 @@ class Dashboard(QtWidgets.QMainWindow):
         # load settings
         SettingHolder.printSettings()
         Settings.load_settings(self._widget)
-
-        self.global_location = os.path.dirname(os.path.realpath(__file__))
     
         # ------ set button image -------
-        icon = QtGui.QIcon(os.path.join(self.global_location,'filePreviewIcon.png'))
+        icon = QtGui.QIcon(os.path.join(self.global_location, 'filePreviewIcon.png'))
         self._widget.btn_file_preview.setIcon(icon)
 
         # ----- connect buttons -----
@@ -479,7 +491,6 @@ class Dashboard(QtWidgets.QMainWindow):
         SettingHolder.folder_excludes = []
         SettingHolder.file_includes = []
         SettingHolder.file_excludes = []
-        SettingHolder.filenames_reviewed = []
         SettingHolder.input_file_types = []
         SettingHolder.output_file_types = []
         SettingHolder.regex_lines = []
@@ -511,14 +522,14 @@ class Dashboard(QtWidgets.QMainWindow):
     @pyqtSlot()
     def show_help(self):
         self.helpWidget = QtWidgets.QWidget()
-        helpui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'help.ui')
+        helpui = os.path.join(self.global_location, 'help.ui')
         uic.loadUi(helpui, self.helpWidget)
         self.helpWidget.show()
 
     @pyqtSlot()
     def show_issue(self):
         self.issueWidget = QtWidgets.QWidget()
-        issueui = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'issue.ui')
+        issueui = os.path.join(self.global_location, 'issue.ui')
         uic.loadUi(issueui, self.issueWidget)
         self.issueWidget.show()
 
@@ -618,6 +629,7 @@ class Dashboard(QtWidgets.QMainWindow):
             options += 'PDF (*.pdf)'
         elif self._widget.cb_txt.isChecked():
             options += 'TXT (*.txt)'
+        self._widget.lbl_error.setText('')
         
         # select a file
         fileSelected = QtWidgets.QFileDialog.getOpenFileName(self._widget, 'Open File', SettingHolder.dir, options)
@@ -660,9 +672,12 @@ class Dashboard(QtWidgets.QMainWindow):
             except:
                 self._widget.lbl_error.setText('pdf could not be opened')
                 return
-            text = parsed_pdf['content'] 
+            text = parsed_pdf['content']
+            if not text:
+                self._widget.lbl_error.setText('pdf to text failed - do you have java 8 in your computer?')
+                return
             self._widget.scraperWidget = QtWidgets.QWidget()
-            uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scraper.ui'), self._widget.scraperWidget)
+            uic.loadUi(os.path.join(self.global_location, 'scraper.ui'), self._widget.scraperWidget)
             self._widget.scraperWidget.lbl_scraper_filename.setText(os.path.basename(fileSelected[0]))
             self._widget.scraperWidget.show()
             regex = r''
@@ -676,7 +691,7 @@ class Dashboard(QtWidgets.QMainWindow):
             lastMatch = 0
             formattedText = ''
             formattedText = '<div>'
-            for match in re.finditer(regex, text):
+            for match in re.finditer(regex, str(text)):
                 start, end = match.span()
                 formattedText += text[lastMatch: start] + colorStr + text[start: end] + resetStr
                 lastMatch = end
@@ -685,7 +700,7 @@ class Dashboard(QtWidgets.QMainWindow):
         elif fileSelected[1] == 'TXT (*.txt)':
             text = open(fileSelected[0]).read()
             self._widget.scraperWidget = QtWidgets.QWidget()
-            uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scraper.ui'), self._widget.scraperWidget)
+            uic.loadUi(os.path.join(self.global_location, 'scraper.ui'), self._widget.scraperWidget)
             self._widget.scraperWidget.lbl_scraper_filename.setText(os.path.basename(fileSelected[0]))
             self._widget.scraperWidget.show()
             regex = r''
@@ -720,7 +735,7 @@ class Dashboard(QtWidgets.QMainWindow):
     @pyqtSlot()
     def addRegex(self):
         self.regexWidget = QtWidgets.QDialog()
-        uic.loadUi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'regex.ui'), self.regexWidget)
+        uic.loadUi(os.path.join(self.global_location, 'regex.ui'), self.regexWidget)
         self.regexWidget.setWindowTitle('Regular Expression')
         self.regexWidget.btn_save_regex.clicked.connect(self.addRegexList)
         self.regexWidget.exec()

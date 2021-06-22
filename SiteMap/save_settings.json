@@ -1,6 +1,8 @@
 {
-    "dir": "C:/",
-    "input-file-types": [],
+    "dir": "/home/gpetri/SiteMapexe/SiteMap/tests",
+    "input-file-types": [
+        ".pdf"
+    ],
     "output-file-types": [],
     "folder-includes": [],
     "folder-excludes": [],

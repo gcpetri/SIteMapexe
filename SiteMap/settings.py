@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from SiteMap.settingholder import SettingHolder
 
 
@@ -9,7 +10,11 @@ class Settings:
 
         # load json data from external file
         data = ''
-        save_settingsjson = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'save_settings.json')
+        if getattr(sys, 'frozen', False):
+            application_path = os.path.join(os.path.dirname(sys.executable), 'SiteMap')
+        elif __file__:
+            application_path = os.path.dirname(__file__)
+        save_settingsjson = os.path.join(application_path, 'save_settings.json')
         json_file = open(save_settingsjson, 'r+')
         try:
             data = json.load(json_file)
@@ -98,6 +103,10 @@ class Settings:
         dict['regex-lines'] = SettingHolder.regex_lines
 
         # write to json file
-        save_settingsjson = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'save_settings.json')
+        if getattr(sys, 'frozen', False):
+            application_path = os.path.join(os.path.dirname(sys.executable), 'SiteMap')
+        elif __file__:
+            application_path = os.path.dirname(__file__)
+        save_settingsjson = os.path.join(application_path, 'save_settings.json')
         with open(save_settingsjson, 'w+') as save_settings:
             json.dump(dict, save_settings, indent=4)
