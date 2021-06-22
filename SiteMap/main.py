@@ -4,13 +4,13 @@ from SiteMap.settings import Settings
 from SiteMap.settingholder import SettingHolder
 import sys
 import os
-from tika import parser
 from zipfile import ZipFile
 import simplekml
 import re
 from lxml import etree
 import math
 import time
+from tika import parser
 
 # ============== Thread Semaphore ============ #
 LOCK = QSemaphore(0)
@@ -94,7 +94,7 @@ class Worker(QThread):
                     gps_coord = re.sub('[^0-9\.,]|\s', '', j)
                     if len(gps_coord) != 0:
                         gps_coordinates.append(gps_coord)
-        if '.kmz' in SettingHolder.output_file_types:
+        if '.kml' in SettingHolder.output_file_types:
             LOCK.aquire()
             for coord in gps_coordinates:
                 pnt = SettingHolder.kmlFile.newPoint(name=_name)
@@ -141,16 +141,24 @@ class Worker(QThread):
             LOCK.release()
             return
         gps_coordinates = []
-        for i in matchingObj:
-            for j in i:
-                if len(j) != 0:
-                    gps_coord = re.sub('[^0-9\.,]|\s', '', j)
+        if len(SettingHolder.regex_lines) > 1:
+            for i in matchingObj:
+                for j in i:
+                    if len(j) != 0:
+                        gps_coord = re.sub('[^0-9\.,]|\s', '', j)
+                        if len(gps_coord) != 0:
+                            gps_coordinates.append(gps_coord)
+        else:
+            for i in matchingObj:
+                if len(i) != 0:
+                    gps_coord = re.sub('[^0-9\.,]|\s', '', i)
                     if len(gps_coord) != 0:
                         gps_coordinates.append(gps_coord)
-        if '.kmz' in SettingHolder.output_file_types:
+        print(gps_coordinates)
+        if '.kml' in SettingHolder.output_file_types:
             LOCK.acquire()
             for coord in gps_coordinates:
-                pnt = SettingHolder.kmlFile.newPoint(name=_name)
+                pnt = SettingHolder.kmlFile.newpoint(name=_name)
                 pnt.coords = [eval(coord)]
                 SettingHolder.kmlFile.save(SettingHolder.kml_output_file)
             LOCK.release()
@@ -566,7 +574,7 @@ class Dashboard(QtWidgets.QMainWindow):
         if len(SettingHolder.input_file_types) == 0:
             self._widget.lbl_error.setText('Select at least one input file type')
             return
-        if len(SettingHolder.output_file_log) == 0:
+        if len(SettingHolder.output_file_types) == 0:
             self._widget.lbl_error.setText('Select at least one output file type')
             return
         if (self._widget.cb_pdf.isChecked()) and len(SettingHolder.file_includes) == 0:
@@ -658,7 +666,7 @@ class Dashboard(QtWidgets.QMainWindow):
             try:
                 parsed_pdf = parser.from_file(fileSelected[0])
             except:
-                self._widget.lbl_error.setText('pdf could not be opened')
+                self._widget.lbl_error.setText('pdf could not be parsed, try adding \' C:\Program Files (x86)\Java\jre1.8.0_281\bin\' to your %PATH%')
                 return
             text = parsed_pdf['content'] 
             self._widget.scraperWidget = QtWidgets.QWidget()

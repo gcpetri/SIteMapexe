@@ -1,7 +1,13 @@
 {
     "dir": "C:/",
-    "input-file-types": [],
-    "output-file-types": [],
+    "input-file-types": [
+        ".kmz",
+        ".pdf"
+    ],
+    "output-file-types": [
+        ".txt",
+        ".kml"
+    ],
     "folder-includes": [],
     "folder-excludes": [],
     "file-includes": [],
