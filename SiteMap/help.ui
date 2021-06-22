@@ -110,7 +110,7 @@
     <item row="5" column="1">
      <widget class="QLabel" name="label_5">
       <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Directory Location&lt;/span&gt;&lt;/p&gt;&lt;p&gt;This is the outermost directory/folder that contains folders and files of job sites..&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Directory Location&lt;/span&gt;&lt;/p&gt;&lt;p&gt;This is the outermost directory/folder that contains folders and files of job sites. Output files are written to C:\tmp\&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
       </property>
       <property name="textFormat">
        <enum>Qt::RichText</enum>
