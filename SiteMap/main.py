@@ -1,12 +1,7 @@
-# pyqt imports
 from PyQt5 import QtWidgets, uic, QtGui
 from PyQt5.QtCore import pyqtSlot, Qt, pyqtSignal, QThread, QSemaphore
-
-# file imports
 from SiteMap.settings import Settings
 from SiteMap.settingholder import SettingHolder
-
-# python libaries
 import sys
 import os
 from tika import parser
@@ -16,7 +11,6 @@ import re
 from lxml import etree
 import math
 import time
-
 
 # ============== Thread Semaphore ============ #
 LOCK = QSemaphore(0)
@@ -226,6 +220,8 @@ class Dashboard(QtWidgets.QMainWindow):
     signalFolder = pyqtSignal()
 
     def __init__(self):
+
+        print(sys.path)
 
         # create widget and load ui
         super().__init__()
